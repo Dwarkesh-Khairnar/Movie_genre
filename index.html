@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>🎬 Movie Genre Classifier</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.14.0"></script>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
+
+  <div class="w-full max-w-2xl p-6 bg-gray-800 rounded-2xl shadow-lg">
+    <h1 class="text-2xl font-bold mb-4 text-center">🎬 Movie Genre Classifier</h1>
+    
+    <textarea id="inputText" 
+      class="w-full p-3 rounded-lg bg-gray-700 text-white mb-4" 
+      rows="4" 
+      placeholder="Enter a movie plot summary..."></textarea>
+    
+    <button id="predictBtn" 
+      class="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded-lg font-semibold transition">
+      🔮 Predict Genre
+    </button>
+    
+    <div id="output" class="mt-4 text-lg font-mono"></div>
+
+    <!-- Toggle Test Cases Button -->
+    <button id="toggleBtn" 
+      class="w-full mt-6 bg-green-600 hover:bg-green-700 py-2 rounded-lg font-semibold transition">
+      📂 Show Example Test Cases
+    </button>
+
+    <!-- Hidden Test Cases Section -->
+    <div id="testCases" class="hidden mt-4 bg-gray-700 p-4 rounded-lg text-sm space-y-2">
+      <p class="font-bold">📌 Example Plots (click on any to test):</p>
+      <ul class="list-disc list-inside space-y-1">
+        <li class="cursor-pointer hover:text-blue-400" onclick="setExample(this)">A soldier fights in World War II</li>
+        <li class="cursor-pointer hover:text-blue-400" onclick="setExample(this)">Two best friends go on a funny road trip</li>
+        <li class="cursor-pointer hover:text-blue-400" onclick="setExample(this)">A haunted house scares a family at night</li>
+        <li class="cursor-pointer hover:text-blue-400" onclick="setExample(this)">A superhero saves the city from destruction</li>
+        <li class="cursor-pointer hover:text-blue-400" onclick="setExample(this)">A boy discovers a magical school of wizards</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // 📌 Expanded Sample Dataset (23 rows)
+    const data = [
+      { text: "A soldier writes letters during World War II", genres: ["Drama", "War"] },
+      { text: "A young hero must save the galaxy from an evil empire", genres: ["Action", "Sci-Fi"] },
+      { text: "A detective investigates murders in the city", genres: ["Crime", "Thriller"] },
+      { text: "Two friends go on a hilarious road trip", genres: ["Comedy", "Adventure"] },
+      { text: "A couple falls in love despite family opposition", genres: ["Romance", "Drama"] },
+      { text: "A haunted house terrorizes a family", genres: ["Horror", "Thriller"] },
+      { text: "A boy discovers a magical world inside a wardrobe", genres: ["Fantasy", "Adventure"] },
+      { text: "A superhero must stop villains from destroying the city", genres: ["Action", "Adventure"] },
+      { text: "A man survives on a deserted island", genres: ["Drama", "Adventure"] },
+      { text: "A group of astronauts explore a distant planet", genres: ["Sci-Fi", "Adventure"] },
+      { text: "A comedian tries to make it big in Hollywood", genres: ["Comedy", "Drama"] },
+      { text: "A vampire falls in love with a human", genres: ["Romance", "Fantasy"] },
+      { text: "A serial killer stalks teenagers at night", genres: ["Horror", "Thriller"] },
+      { text: "A princess finds her true love in an enchanted castle", genres: ["Fantasy", "Romance"] },
+      { text: "A family goes on vacation and faces unexpected chaos", genres: ["Comedy"] },
+      { text: "A scientist creates a time machine", genres: ["Sci-Fi", "Adventure"] },
+      { text: "An orphan boy attends a school of magic", genres: ["Fantasy", "Adventure"] },
+      { text: "A man and woman from rival families fall in love", genres: ["Romance", "Drama"] },
+      { text: "An underdog boxer fights for the championship", genres: ["Drama", "Action"] },
+      { text: "A clown terrorizes a small town", genres: ["Horror"] },
+      { text: "A group of friends battle monsters in their neighborhood", genres: ["Fantasy", "Horror"] },
+      { text: "A talking toy goes on a rescue mission", genres: ["Animation", "Adventure"] },
+      { text: "A robot learns what it means to be human", genres: ["Sci-Fi", "Drama"] }
+    ];
+
+    // Unique genres
+    const allGenres = [...new Set(data.flatMap(d => d.genres))];
+    const genreToIndex = Object.fromEntries(allGenres.map((g, i) => [g, i]));
+
+    // Build vocab
+    const vocab = {};
+    data.forEach(d => d.text.toLowerCase().split(/\W+/).forEach(w => {
+      if (w) vocab[w] = (vocab[w] || 0) + 1;
+    }));
+    const words = Object.keys(vocab);
+    const wordToIndex = Object.fromEntries(words.map((w, i) => [w, i]));
+
+    function encodeText(text) {
+      const vec = new Array(words.length).fill(0);
+      text.toLowerCase().split(/\W+/).forEach(w => {
+        if (wordToIndex[w] !== undefined) vec[wordToIndex[w]] = 1;
+      });
+      return vec;
+    }
+
+    // Prepare dataset
+    const xs = tf.tensor2d(data.map(d => encodeText(d.text)));
+    const ys = tf.tensor2d(data.map(d => {
+      const arr = new Array(allGenres.length).fill(0);
+      d.genres.forEach(g => arr[genreToIndex[g]] = 1);
+      return arr;
+    }));
+
+    // 🔧 Model
+    const model = tf.sequential();
+    model.add(tf.layers.dense({ inputShape: [words.length], units: 64, activation: "relu" }));
+    model.add(tf.layers.dense({ units: allGenres.length, activation: "sigmoid" }));
+    model.compile({ optimizer: "adam", loss: "binaryCrossentropy", metrics: ["accuracy"] });
+
+    async function trainModel() {
+      await model.fit(xs, ys, { epochs: 30, verbose: 0 });
+      console.log("✅ Training complete");
+    }
+
+    async function predictGenre() {
+      const text = document.getElementById("inputText").value;
+      if (!text.trim()) {
+        document.getElementById("output").innerText = "⚠️ Please enter a movie plot.";
+        return;
+      }
+      const inputVec = tf.tensor2d([encodeText(text)]);
+      const pred = model.predict(inputVec);
+      const probs = await pred.data();
+      const results = allGenres.map((g, i) => ({ genre: g, prob: probs[i] }))
+        .sort((a,b) => b.prob - a.prob);
+      document.getElementById("output").innerHTML = results
+        .map(r => `${r.genre}: ${(r.prob*100).toFixed(1)}%`)
+        .join("<br>");
+    }
+
+    // 🎬 Train on page load
+    trainModel();
+    document.getElementById("predictBtn").addEventListener("click", predictGenre);
+
+    // Toggle test cases
+    const toggleBtn = document.getElementById("toggleBtn");
+    const testCases = document.getElementById("testCases");
+    let visible = false;
+    toggleBtn.addEventListener("click", () => {
+      visible = !visible;
+      testCases.classList.toggle("hidden", !visible);
+      toggleBtn.innerText = visible ? "📂 Hide Example Test Cases" : "📂 Show Example Test Cases";
+    });
+
+    // Set example text on click
+    function setExample(el) {
+      document.getElementById("inputText").value = el.innerText;
+    }
+    window.setExample = setExample; // expose for onclick
+  </script>
+</body>
+</html>
