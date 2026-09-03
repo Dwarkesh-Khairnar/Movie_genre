@@ -5,6 +5,8 @@
  - js
  - TE.js
 
+## Frontend 
+ - Tailwind Css
 ## Deployment 
  - netlify
     - free
