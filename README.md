@@ -9,5 +9,3 @@
  - Tailwind Css
 ## Deployment 
  - netlify
-    - free
-
