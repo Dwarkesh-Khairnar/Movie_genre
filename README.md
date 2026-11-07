@@ -7,6 +7,3 @@
 
 ## Frontend 
  - Tailwind Css
-## Deployment 
- - netlify
-# nothing
